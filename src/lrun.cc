@@ -183,6 +183,14 @@ static void configure_cgroup() {
         }
     }
 
+    // cpu quota
+    if (config.cfs_period_us > 0 && config.cfs_quota_us > 0) {
+        if (cg.set_cpu_cfs_quota(config.cfs_period_us, config.cfs_quota_us)) {
+            ERROR("can not set cpu cfs quota");
+            clean_cg_exit(cg, 2);
+        }
+    }
+
     // some cgroup options, fail quietly
     cg.set(Cgroup::CG_MEMORY, "memory.swappiness", "0\n");
 

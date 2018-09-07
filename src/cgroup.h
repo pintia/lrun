@@ -51,12 +51,13 @@ namespace lrun {
                 CG_MEMORY  = 1,
                 CG_DEVICES = 2,
                 CG_FREEZER = 3,
+                CG_CPU = 4,
             };
 
             /**
              * cgroup subsystem names
              */
-            static const char subsys_names[4][8];
+            static const char subsys_names[5][8];
             static const int SUBSYS_COUNT = sizeof(subsys_names) / sizeof(subsys_names[0]);
 
             /**
@@ -253,6 +254,13 @@ namespace lrun {
              *         <0           failed
              */
             int reset_cpu_usage();
+
+            /**
+             * set cpu cfs quota
+             * @return  0           success
+             *         <0           failed
+             */
+            int set_cpu_cfs_quota(long long period, long long quota);
 
             /**
              * limit devices to null, zero, full, random and urandom

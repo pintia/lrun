@@ -68,6 +68,12 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
         if (option == "max-cpu-time") {
             REQUIRE_NARGV(1);
             config.cpu_time_limit = NEXT_DOUBLE_ARG;
+        } else if (option == "cfs-period-us") {
+            REQUIRE_NARGV(1);
+            config.cfs_period_us = NEXT_LONG_LONG_ARG;
+        } else if (option == "cfs-quota-us") {
+            REQUIRE_NARGV(1);
+            config.cfs_quota_us = NEXT_LONG_LONG_ARG;
         } else if (option == "max-real-time") {
             REQUIRE_NARGV(1);
             config.real_time_limit = NEXT_DOUBLE_ARG;

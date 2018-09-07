@@ -48,11 +48,12 @@ using namespace lrun;
 using std::string;
 using std::list;
 
-const char Cgroup::subsys_names[4][8] = {
+const char Cgroup::subsys_names[5][8] = {
     "cpuacct",
     "memory",
     "devices",
     "freezer",
+    "cpu",
 };
 
 static struct {
@@ -392,6 +393,13 @@ int Cgroup::reset_usages() {
 int Cgroup::reset_cpu_usage() {
     int e = 0;
     e = set(CG_CPUACCT, "cpuacct.usage", "0");
+    return e ? -1 : 0;
+}
+
+int Cgroup::set_cpu_cfs_quota(long long period, long long quota) {
+    int e = 0;
+    e += set(CG_CPU, "cpu.cfs_period_us", strconv::from_longlong(period));
+    e += set(CG_CPU, "cpu.cfs_quota_us", strconv::from_longlong(quota));
     return e ? -1 : 0;
 }
 

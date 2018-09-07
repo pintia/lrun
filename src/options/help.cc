@@ -85,6 +85,8 @@ static string help_content(int width) {
         "  --max-cpu-time    seconds     Limit cpu time. `seconds` can be a floating-point number\n"
         "  --max-real-time   seconds     Limit physical time\n"
         "  --max-memory      bytes       Limit memory (+swap) usage. `bytes` supports common suffix like `k`, `m`, `g`\n"
+        "  --cfs-period-us   n           Limit CPU CFS (Completely Fair Scheduler) period\n"
+        "  --cfs-quota-us    n           Limit CPU CFS (Completely Fair Scheduler) quota\n"
         "  --max-output      bytes       Limit output. Note: lrun will make a \"best  effort\" to enforce the limit but it is NOT accurate\n"
         "  --max-rtprio      n           Set max realtime priority\n"
         "  --max-nfile       n           Set max number of file descriptors\n"

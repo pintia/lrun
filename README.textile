@@ -24,6 +24,27 @@ h3. Installation dependencies
 * *groupadd*: create @lrun@ group.
 * *sudo*: (optional) install via a non-root user.
 
+h2. Build deb package
+
+h3. Build dependencies
+
+* *debhelper*: (>= 8)
+* *libseccomp-dev*: (>= 2.0)
+* *devscripts*: lots of useful scripts for Debian Development (including: dch, debuild, uscan, uupdate and many others).
+* *pkg-config*
+
+h3. Bump version
+
+<pre>
+dch -i
+</pre>
+
+h3. Build package
+
+<pre>
+dpkg-buildpackage -uc -us
+</pre>
+
 h2. Installation
 
 h3. Build from source

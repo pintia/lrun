@@ -40,6 +40,8 @@ MainConfig::MainConfig() {
     this->real_time_limit = -1;
     this->memory_limit = -1;
     this->output_limit = -1;
+    this->cfs_period_us = 0;
+    this->cfs_quota_us = 0;
     this->enable_devices_whitelist = false;
     this->enable_network = true;
     this->enable_pidns = true;
@@ -59,6 +61,7 @@ MainConfig::MainConfig() {
     this->arg.reset_env = 0;
     this->arg.no_new_privs = true;
     this->arg.umount_outside = false;
+    this->arg.reuse_netns = false;
     this->arg.clone_flags = 0;
     this->arg.stdout_fd = STDOUT_FILENO;
     this->arg.stderr_fd = STDERR_FILENO;

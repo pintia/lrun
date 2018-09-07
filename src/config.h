@@ -35,6 +35,8 @@ namespace lrun {
         double real_time_limit;
         long long memory_limit;
         long long output_limit;
+        long long cfs_period_us;
+        long long cfs_quota_us;
         bool enable_devices_whitelist;
         bool enable_network;
         bool enable_pidns;
