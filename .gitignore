@@ -16,3 +16,5 @@ tools/netns-empty/netns-empty
 !*.h
 !*.rb
 !Makefile
+
+.direnv/
