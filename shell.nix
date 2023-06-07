@@ -1,14 +1,19 @@
 { pkgs ? import <nixpkgs> { } }:
-
 pkgs.mkShell {
   buildInputs = with pkgs; [
+    mount
+    gnugrep
+
     gcc
     glib
-    # glibc
     rake
     pkg-config
-    libseccomp
+    # libseccomp
+    libseccomp.dev
     cmake
     ninja
   ];
+  shellHook = ''
+    export PATH=$PATH:`pwd`/cmake-build-debug
+  '';
 }

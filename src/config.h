@@ -46,8 +46,12 @@ namespace lrun {
         Cgroup* active_cgroup;
 
         std::vector<gid_t> groups;
+#ifdef CGROUP_V1
         std::map<std::pair<Cgroup::subsys_id_t, std::string>, std::string> cgroup_options;
-
+#endif
+#ifdef CGROUP_V2
+        std::map<std::string, std::string> cgroup_options;
+#endif
         MainConfig();
 
         // check config permissions. print errors and exit

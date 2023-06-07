@@ -217,6 +217,7 @@ void MainConfig::check() {
                     "Non-root users cannot use `--cgroup-option`");
         }
 
+#ifdef CGROUP_V1
         FOR_EACH(p, this->cgroup_options) {
             const string& key = p.first.second;
             if (key.find("..") != string::npos || key.find("/") != string::npos) {
@@ -224,6 +225,16 @@ void MainConfig::check() {
                         "Invalid cgroup option key: `" + key + "`");
             }
         }
+#endif
+#ifdef CGROUP_V2
+        FOR_EACH(p, this->cgroup_options) {
+            const string& key = p.first;
+            if (key.find("..") != string::npos || key.find("/") != string::npos) {
+                error_messages.push_back(
+                        "Invalid cgroup option key: `" + key + "`");
+            }
+        }
+#endif
     }
 
     if (this->arg.syscall_list.empty() && this->arg.syscall_action == seccomp::action_t::DEFAULT_EPERM) {

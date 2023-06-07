@@ -26,7 +26,6 @@
 #include <cmath>
 #include <vector>
 #include <string>
-#include <stropts.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -107,6 +106,8 @@ static void signal_handler(int signal) {
 # ifndef NLIBSEGFAULT
 // compile with -ldl
 #include <dlfcn.h>
+#include <thread>
+
 static struct LibSegFaultLoader {
     LibSegFaultLoader() {
         // try to load libSegFault.so
@@ -189,6 +190,7 @@ static void configure_cgroup() {
         }
     }
 
+#ifdef CGROUP_V1
     // some cgroup options, fail quietly
     cg.set(Cgroup::CG_MEMORY, "memory.swappiness", "0\n");
 
@@ -203,6 +205,19 @@ static void configure_cgroup() {
             clean_cg_exit(cg, 7);
         }
     }
+#endif
+#ifdef CGROUP_V2
+    // some cgroup options, fail quietly
+    cg.set("memory.swap.max", "0\n");
+
+    // other cgroup options
+    FOR_EACH(p, config.cgroup_options) {
+        if (cg.set(p.first, p.second)) {
+            ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
+            clean_cg_exit(cg, 7);
+        }
+    }
+#endif
 
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created
@@ -428,7 +443,7 @@ int main(int argc, char * argv[]) {
     {
         Cgroup& cg = *config.active_cgroup;
         // lock the cgroup so other lrun process with same cgname will wait
-        fs::ScopedFileLock cg_lock(cg.subsys_path().c_str());
+        fs::ScopedFileLock cg_lock(cg.group_path().c_str());
         configure_cgroup();
         int ret = run_command();
         clean_cg_exit(cg, ret);
