@@ -242,6 +242,14 @@ h3. mirrorfs
 
 A utility helps to set up chroot environments by mirror partial of the current filesystem. The binary is available as lrun-mirrorfs in deb package.
 
+h2. Testing
+
+cgroup v2 support is tested on Ubuntu 22.04. It's a good idea to run the testing in container. You can take test.Dockerfile as a starting point.
+Some useful issues:
+<pre>
+https://github.com/moby/moby/issues/43093
+</pre>
+
 h2. Troubleshooting
 
 *Error: "FATAL: can not mount cgroup memory on '/sys/fs/cgroup/memory' (No such file or directory)"*
