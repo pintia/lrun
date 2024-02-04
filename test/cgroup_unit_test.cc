@@ -20,13 +20,17 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "cgroup.h"
+#include "../src/cgroup.h"
 #include "test.h"
 
 using namespace lrun;
 
 TESTCASE(get_path) {
+#if defined(CGROUP_V1)
     CHECK(!Cgroup::base_path(Cgroup::CG_CPUACCT, true).empty());
+#elif defined(CGROUP_V2)
+    CHECK(!Cgroup::base_path(true).empty());
+#endif
 }
 
 TESTCASE(create_and_destroy) {
@@ -39,8 +43,13 @@ TESTCASE(create_and_destroy) {
 TESTCASE(set_properties) {
     Cgroup cg = Cgroup::create("testsetprop");
     // FIXME assume no swap here
+#if defined(CGROUP_V1)
     CHECK(cg.set(Cgroup::CG_MEMORY, "memory.limit_in_bytes", "1048576") == 0);
     CHECK(cg.get(Cgroup::CG_MEMORY, "memory.limit_in_bytes") == "1048576\n");
+#elif defined(CGROUP_V2)
+    CHECK(cg.set("memory.max", "1048576") == 0);
+    CHECK(cg.get("memory.max") == "1048576\n");
+#endif
     CHECK(cg.reset_usages() == 0);
     CHECK(cg.destroy() == 0);
 }

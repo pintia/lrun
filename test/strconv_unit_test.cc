@@ -21,7 +21,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "test.h"
-#include "utils/strconv.h"
+#include "../src/utils/strconv.h"
 
 using namespace strconv;
 
