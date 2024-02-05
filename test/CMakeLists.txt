@@ -32,6 +32,8 @@ add_executable(cgroup_unit_test
         ../src/seccomp.cc
         cgroup_unit_test.cc)
 add_test(NAME cgroup_unit_test COMMAND cgroup_unit_test)
+target_compile_definitions(cgroup_unit_test PUBLIC -DUNIT_TEST)
+
 
 if($ENV{NOSECCOMP})
     add_definitions(-DLIBSECCOMP_VERSION_MAJOR=0)
@@ -46,14 +48,6 @@ else()
     endif()
 endif()
 
-execute_process(COMMAND bash -c "mount -l | grep \"/sys/fs/cgroup type cgroup2\"" RESULT_VARIABLE CGROUP_CHECK)
-if(${CGROUP_CHECK} EQUAL "0")
-    message("Detected cgroup v2, setting CGROUP_VERSION=2")
-    target_compile_definitions(cgroup_unit_test PUBLIC -DCGROUP_VERSION=2)
-else()
-    message("No cgroup v2, setting CGROUP_VERSION=1")
-    target_compile_definitions(cgroup_unit_test PUBLIC -DCGROUP_VERSION=1)
-endif()
 add_custom_command(TARGET cgroup_unit_test POST_BUILD COMMAND sudo install -D -m4550 -oroot -glrun ${CMAKE_CURRENT_BINARY_DIR}/cgroup_unit_test ${CMAKE_BINARY_DIR}/cgroup_unit_test)
 
 add_executable(strconv_unit_test

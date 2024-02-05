@@ -150,10 +150,11 @@ static void create_cgroup() {
     INFO("cgname = '%s'", cgname.c_str());
 
     // create or reuse group
-    static Cgroup new_cg = Cgroup::create(cgname);
+    static std::unique_ptr<Cgroup> new_cg = CgroupFactory::create(cgname);
+    Cgroup& cg = *new_cg;
 
-    if (!new_cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
-    config.active_cgroup = &new_cg;
+    if (!cg.valid()) FATAL("can not create cgroup '%s'", cgname.c_str());
+    config.active_cgroup = std::move(new_cg);
 }
 
 static int cgroup_callback_child(void * /* args */) {
@@ -190,34 +191,14 @@ static void configure_cgroup() {
         }
     }
 
-#ifdef CGROUP_V1
-    // some cgroup options, fail quietly
-    cg.set(Cgroup::CG_MEMORY, "memory.swappiness", "0\n");
-
-    // enable oom killer now so our buggy code won't freeze.
-    // we will disable it later.
-    cg.set(Cgroup::CG_MEMORY, "memory.oom_control", "0\n");
-
-    // other cgroup options
-    FOR_EACH(p, config.cgroup_options) {
-        if (cg.set(p.first.first, p.first.second, p.second)) {
-            ERROR("can not set cgroup option '%s' to '%s'", p.first.second.c_str(), p.second.c_str());
-            clean_cg_exit(cg, 7);
-        }
+    if (cg.version() == 1) {
+        int e = dynamic_cast<CgroupV1&>(cg).configure(config.cgroup_v1_options);
+        if (e) clean_cg_exit(cg, 7);
     }
-#endif
-#ifdef CGROUP_V2
-    // some cgroup options, fail quietly
-    cg.set("memory.swap.max", "0\n");
-
-    // other cgroup options
-    FOR_EACH(p, config.cgroup_options) {
-        if (cg.set(p.first, p.second)) {
-            ERROR("can not set cgroup option '%s' to '%s'", p.first.c_str(), p.second.c_str());
-            clean_cg_exit(cg, 7);
-        }
+    if (cg.version() == 2) {
+        int e = dynamic_cast<CgroupV2&>(cg).configure(config.cgroup_v2_options);
+        if (e) clean_cg_exit(cg, 7);
     }
-#endif
 
     // reset cpu / memory usage and killall existing processes
     // not needed if cg can be guarnteed that is newly created
@@ -443,7 +424,7 @@ int main(int argc, char * argv[]) {
     {
         Cgroup& cg = *config.active_cgroup;
         // lock the cgroup so other lrun process with same cgname will wait
-        fs::ScopedFileLock cg_lock(cg.group_path().c_str());
+        fs::ScopedFileLock cg_lock(cg.lock_path().c_str());
         configure_cgroup();
         int ret = run_command();
         clean_cg_exit(cg, ret);

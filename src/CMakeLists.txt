@@ -25,6 +25,9 @@ set(CPP_HEADERS
 
 set(CPP_SOURCES
         cgroup.cc
+        cgroup_factory.cc
+        cgroupv1.cc
+        cgroupv2.cc
         config.cc
         fs_tracer.cc
         lrun.cc
@@ -51,15 +54,6 @@ else()
         target_include_directories(lrun BEFORE PRIVATE ${SECCOMP_INCLUDE_DIRS})
         target_link_libraries(lrun PUBLIC ${SECCOMP_LIBRARIES})
     endif()
-endif()
-
-execute_process(COMMAND bash -c "mount -l | grep \"/sys/fs/cgroup type cgroup2\"" RESULT_VARIABLE CGROUP_CHECK)
-if(${CGROUP_CHECK} EQUAL "0")
-    message("Detected cgroup v2, setting CGROUP_VERSION=2")
-    target_compile_definitions(lrun PUBLIC -DCGROUP_VERSION=2)
-else()
-    message("No cgroup v2, setting CGROUP_VERSION=1")
-    target_compile_definitions(lrun PUBLIC -DCGROUP_VERSION=1)
 endif()
 
 add_custom_command(TARGET lrun POST_BUILD COMMAND sudo install -D -m4550 -oroot -glrun ${CMAKE_CURRENT_BINARY_DIR}/lrun ${CMAKE_BINARY_DIR}/lrun)

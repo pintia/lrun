@@ -241,27 +241,25 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
             string path = NEXT_STRING_ARG;
             long long bytes = strconv::to_bytes(NEXT_STRING_ARG);
             config.arg.tmpfs_list.push_back(make_pair(path, bytes));
-        } else if (option == "cgroup-option") {
-#ifdef CGROUP_V1
+        } else if (CgroupFactory::cg_version() == 1 && option == "cgroup-v1-option") {
             REQUIRE_NARGV(3);
             string subsys_name = NEXT_STRING_ARG;
             string key = NEXT_STRING_ARG;
             string value = NEXT_STRING_ARG;
-            int subsys_id = Cgroup::subsys_id_from_name(subsys_name.c_str());
+            int subsys_id = CgroupV1::subsys_id_from_name(subsys_name.c_str());
             if (subsys_id >= 0) {
                 if (key.find("..") != string::npos || key.find('/') != string::npos) {
                     WARNING("unsafe cgroup option '%s' = '%s' ignored",
                             key.c_str(), value.c_str());
                 } else {
-                    config.cgroup_options[make_pair((Cgroup::subsys_id_t)subsys_id, key)] = value;
+                    config.cgroup_v1_options[make_pair((CgroupV1::subsys_id_t) subsys_id, key)] = value;
                 }
             } else {
                 WARNING("cgroup option '%s' = '%s' ignored: "
                         "subsystem '%s' not found",
                         key.c_str(), value.c_str(), subsys_name.c_str());
             }
-#endif
-#ifdef CGROUP_V2
+        } else if (CgroupFactory::cg_version() == 2 && option == "cgroup-v2-option") {
             REQUIRE_NARGV(2);
             string key = NEXT_STRING_ARG;
             string value = NEXT_STRING_ARG;
@@ -269,9 +267,8 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
                 WARNING("unsafe cgroup option '%s' = '%s' ignored",
                         key.c_str(), value.c_str());
             } else {
-                config.cgroup_options[key] = value;
+                config.cgroup_v2_options[key] = value;
             }
-#endif
         } else if (option == "env") {
             REQUIRE_NARGV(2);
             string key = NEXT_STRING_ARG;

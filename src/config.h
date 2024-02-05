@@ -43,15 +43,13 @@ namespace lrun {
         useconds_t interval;
         std::string cgname;
         std::string netns;  // compatible with "ip netns"
-        Cgroup* active_cgroup;
+        std::unique_ptr<Cgroup> active_cgroup;
 
         std::vector<gid_t> groups;
-#ifdef CGROUP_V1
-        std::map<std::pair<Cgroup::subsys_id_t, std::string>, std::string> cgroup_options;
-#endif
-#ifdef CGROUP_V2
-        std::map<std::string, std::string> cgroup_options;
-#endif
+
+        std::map<std::pair<CgroupV1::subsys_id_t, std::string>, std::string> cgroup_v1_options;
+        std::map<std::string, std::string> cgroup_v2_options;
+
         MainConfig();
 
         // check config permissions. print errors and exit

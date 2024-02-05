@@ -27,6 +27,7 @@
 #include <set>
 #include <list>
 #include <sys/resource.h>
+#include <memory>
 #include "seccomp.h"
 
 // Old system does not have RLIMIT_RTTIME, define it as invalid
@@ -47,99 +48,31 @@ namespace lrun {
 
     class Cgroup {
     public:
-        // Cgroup static methods
-#if defined(CGROUP_V1)
-        /**
-         * cgroup subsystem ids
-         */
-        enum subsys_id_t {
-            CG_CPUACCT = 0,
-            CG_MEMORY  = 1,
-            CG_DEVICES = 2,
-            CG_FREEZER = 3,
-        };
-
-        /**
-         * cgroup subsystem names
-         */
-        static const char subsys_names[4][8];
-        static const int SUBSYS_COUNT = sizeof(subsys_names) / sizeof(subsys_names[0]);
-
-        /**
-         * get cgroup subsystem id from name
-         * @param   name            cgroup subsystem name
-         * @return  >=0             cgroup subsystem id
-         *          -1              subsystem id not found
-         */
-        static int subsys_id_from_name(const char * const name);
-#elif defined(CGROUP_V2)
-        /**
-         * only cgroup v1 have subsystems.
-         */
-#endif
-
-        /**
-         * get cgroup mounted path
-         * @param   create_on_need  mount cgroup if not mounted
-         * @return  cgroup mounted path (first one in mount table)
-         */
-#if defined(CGROUP_V1)
-        static std::string base_path(subsys_id_t subsys_id, bool create_on_need = true);
-#elif defined(CGROUP_V2)
-
-        static std::string base_path(bool create_on_need = true);
-
-#endif
-
-
         /**
          * create a cgroup, use existing if possible
          * @return  Cgroup object
          */
-        static Cgroup create(const std::string &name);
+        // virtual Cgroup create(const std::string &name) = 0;
 
         /**
-         * @return  1           exist
-         *          0           not exist
+         * file path for lock
+         * @return lock path
          */
-        static int exists(const std::string &name);
+        virtual std::string lock_path() const = 0;
 
-#if defined(CGROUP_V1)
         /**
-         * @param   subsys_id   cgroup subsystem id
-         * @param   name        group name
-         * @return  full path   "#{path_}/#{name}"
+         * cgroup version
+         * @return 1            v1
+         *         2            v2
          */
-        static std::string path_from_name(subsys_id_t subsys_id, const std::string& name);
-#elif defined(CGROUP_V2)
-        /**
-        * @param   name        group name
-        * @return  full path   "#{path_}/#{name}"
-        */
-        static std::string path_from_name(const std::string &name);
-#endif
-
-#if defined(CGROUP_V1)
-        /**
-         * @param   subsys_id   cgroup subsystem id
-         * @return  full path
-         */
-        std::string subsys_path(subsys_id_t subsys_id = CG_CPUACCT) const;
-#elif defined(CGROUP_V2)
-        /**
-         * @return full path of group
-         */
-        std::string group_path() const;
-#endif
-
-        // Cgroup low level methods
+        int version() { return version_; };
 
         /**
          * kill all processes and destroy this cgroup
          * @return 0            success
          *         other        failed
          */
-        int destroy();
+        virtual int destroy() = 0;
 
         /**
          * set a cgroup property
@@ -151,11 +84,7 @@ namespace lrun {
          * @return  0           success
          *         <0           failed
          */
-#if defined(CGROUP_V1)
-        int set(subsys_id_t subsys_id, const std::string &property, const std::string &value);
-#elif defined(CGROUP_V2)
-        int set(const std::string &property, const std::string &value);
-#endif
+         // abstract int set();
 
         /**
          * get property
@@ -163,11 +92,7 @@ namespace lrun {
          * @param   max_length  max length to read (not include '\0')
          * @return  string      readed property, empty if fail
          */
-#if defined(CGROUP_V1)
-        std::string get(subsys_id_t subsys_id, const std::string &property, size_t max_length = 255) const;
-#elif defined(CGROUP_V2)
-        std::string get(const std::string &property, size_t max_length = 255) const;
-#endif
+         // abstract std::string get();
 
         /**
          * set a cgroup property to the same value as parent
@@ -175,11 +100,7 @@ namespace lrun {
          * @return  0           success
          *         <0           failed
          */
-#if defined(CGROUP_V1)
-        int inherit(subsys_id_t subsys_id, const std::string &property);
-#elif defined(CGROUP_V2)
-        int inherit(const std::string &property);
-#endif
+         // abstract int inherit();
 
         /**
          * attach a process
@@ -187,32 +108,32 @@ namespace lrun {
          * @return  0           success
          *         <0           failed
          */
-        int attach(pid_t pid);
+        virtual int attach(pid_t pid) = 0;
 
         /**
          * check if Cgroup is invalid
          * @return  true        valid
          *          false       invalid
          */
-        bool valid() const;
+        virtual bool valid() const = 0;
 
 
         /**
          * scan group processes and update output usage
          */
-        void update_output_count();
+        virtual void update_output_count() = 0;
 
         /**
          * return output usage
          * @return  bytes      output usage
          */
-        long long output_usage() const;
+        virtual long long output_usage() const = 0;
 
         /**
          * get pid list
          * @return  pids       a list of pids in the cgroup
          */
-        std::list<pid_t> get_pids();
+        virtual std::list<pid_t> get_pids() = 0;
 
         // Cgroup high level methods
 
@@ -221,14 +142,14 @@ namespace lrun {
          * @return  1           yes, the cgroup has no processes attached
          *          0           no, the cgroup has processes attached
          */
-        int empty();
+        virtual int empty() = 0;
 
         /**
          * check if a process is in this cgroup
          * @return  true        the process is in this cgroup
          *          false       otherwise
          */
-        bool has_pid(pid_t pid);
+        virtual bool has_pid(pid_t pid) = 0;
 
         /**
          * kill all tasks until no more tasks alive.
@@ -236,7 +157,7 @@ namespace lrun {
          * @param   confirm     true: block until all tasks are confirmed gone
          *                      false: just send kill, do not confirm
          */
-        void killall(bool confirm = true);
+        virtual void killall(bool confirm = true) = 0;
 
         /**
          * use freezer cgroup subsystem to freeze processes
@@ -250,38 +171,38 @@ namespace lrun {
          * @return  0           success
          *          otherwise   failed
          */
-        int freeze(bool freeze = true, int timeout = 5);
+        virtual int freeze(bool freeze = true, int timeout = 5) = 0;
 
         /**
          * get current memory usage
          * @return  memory usage in bytes
          */
-        long long memory_current() const;
+        virtual long long memory_current() const = 0;
 
         /**
          * get peak memory usage
          * @return  memory usage in bytes
          */
-        long long memory_peak() const;
+        virtual long long memory_peak() const = 0;
 
         /**
          * get memory limit
          * @return  memory limit in bytes
          */
-        long long memory_limit() const;
+        virtual long long memory_limit() const = 0;
 
         /**
          * test if the cgroup is under OOM
          * @return  true   if under OOM
          *          false  otherwise
          */
-        bool is_under_oom() const;
+        virtual bool is_under_oom() const = 0;
 
         /**
          * get cpu usage
          * @return  cpu usage in seconds
          */
-        double cpu_usage() const;
+        virtual double cpu_usage() const = 0;
 
         /**
          * set memory usage limit
@@ -289,21 +210,21 @@ namespace lrun {
          * @return >=0          success, real memory limit
          *         <0           failed
          */
-        long long set_memory_limit(long long bytes);
+        virtual long long set_memory_limit(long long bytes) = 0;
 
         /**
          * restart cpuacct and memory max_usage_in_bytes
          * @return  0           success
          *         <0           failed
          */
-        int reset_usages();
+        virtual int reset_usages() = 0;
 
         /**
          * restart cpuacct usage
          * @return  0           success
          *         <0           failed
          */
-        int reset_cpu_usage();
+        virtual int reset_cpu_usage() = 0;
 
         /**
          * limit devices to null, zero, full, random and urandom
@@ -311,7 +232,7 @@ namespace lrun {
          * @return  0           success
          *         <0           failed
          */
-        int limit_devices();
+        virtual int limit_devices() = 0;
 
         /**
          * structure used for forked child
@@ -371,12 +292,13 @@ namespace lrun {
          * @param   arg         swapn arg, @see struct spawn_arg
          * @return  pid         child pid, negative if failed
          */
-        pid_t spawn(spawn_arg &arg);
+        virtual pid_t spawn(spawn_arg &arg) = 0;
 
-    private:
-
-        Cgroup();
-
+    protected:
+        /**
+         * cgroup version (1 or 2)
+         */
+        int version_;
         /**
          * cgroup directory name
          */
@@ -392,15 +314,234 @@ namespace lrun {
          */
         pid_t init_pid_;
 
-#if defined(CGROUP_V1)
+        Cgroup() {};
+    };
+}
+
+namespace lrun {
+    class CgroupV1;
+    class CgroupV2;
+
+    class CgroupV1: public lrun::Cgroup {
+    public:
+        /**
+         * cgroup subsystem ids
+         */
+        enum subsys_id_t {
+            CG_CPUACCT = 0,
+            CG_MEMORY  = 1,
+            CG_DEVICES = 2,
+            CG_FREEZER = 3,
+        };
+
+        /**
+         * cgroup subsystem names
+         */
+        static const char subsys_names[4][8];
+        static const int SUBSYS_COUNT = sizeof(subsys_names) / sizeof(subsys_names[0]);
+
+        /**
+         * get cgroup subsystem id from name
+         * @param   name            cgroup subsystem name
+         * @return  >=0             cgroup subsystem id
+         *          -1              subsystem id not found
+         */
+        static int subsys_id_from_name(const char * const name);
+
+        /**
+         * get cgroup mounted path
+         * @param   create_on_need  mount cgroup if not mounted
+         * @return  cgroup mounted path (first one in mount table)
+         */
+        static std::string base_path(subsys_id_t subsys_id, bool create_on_need = true);
+
+        /**
+         * create a cgroup, use existing if possible
+         * @return  Cgroup object
+         */
+        static CgroupV1 create(const std::string& name);
+
+        /**
+         * set a cgroup property
+         * WARNING: property is not filtered, do not pass untrusted user-generated
+         * content here!
+         *
+         * @param   property    property
+         * @param   value       value
+         * @return  0           success
+         *         <0           failed
+         */
+        int set(subsys_id_t subsys_id, const std::string &property, const std::string &value);
+
+        /**
+         * get property
+         * @param   property    property
+         * @param   max_length  max length to read (not include '\0')
+         * @return  string      readed property, empty if fail
+         */
+        std::string get(subsys_id_t subsys_id, const std::string &property, size_t max_length = 255) const;
+
+        /**
+         * configure a cgroup with multiple options
+         * generally for initialization
+         */
+        int configure(std::map<std::pair<CgroupV1::subsys_id_t, std::string>, std::string> cgroup_options);
+
+    protected:
+        std::string lock_path() const override;
+        bool valid() const override;
+        void update_output_count() override;
+        long long output_usage() const override;
+        std::list<pid_t> get_pids() override;
+        bool has_pid(pid_t pid) override;
+        int freeze(bool freeze = true, int timeout = 5) override;
+        int empty() override;
+        void killall(bool confirm = true) override;
+        int destroy() override;
+        int attach(pid_t pid) override;
+        int limit_devices() override;
+        int reset_usages() override;
+        int reset_cpu_usage() override;
+        double cpu_usage() const override;
+        long long memory_current() const override;
+        long long memory_peak() const override;
+        long long memory_limit() const override;
+        bool is_under_oom() const override;
+        long long set_memory_limit(long long bytes) override;
+        pid_t spawn(lrun::Cgroup::spawn_arg &arg) override;
+    private:
+        /**
+         * @return  1           exist
+         *          0           not exist
+         */
+        static int exists(const std::string &name);
+
+        /**
+         * @param   subsys_id   cgroup subsystem id
+         * @param   name        group name
+         * @return  full path   "#{path_}/#{name}"
+         */
+        static std::string path_from_name(subsys_id_t subsys_id, const std::string& name);
+
+        /**
+         * @param   subsys_id   cgroup subsystem id
+         * @return  full path
+         */
+        std::string subsys_path(subsys_id_t subsys_id = CG_CPUACCT) const;
+
+        /**
+         * set a cgroup property to the same value as parent
+         * @param   property    property
+         * @return  0           success
+         *         <0           failed
+         */
+        int inherit(subsys_id_t subsys_id, const std::string &property);
+
         /**
          * cached paths
          */
         static std::string subsys_base_paths_[SUBSYS_COUNT];
-#elif defined(CGROUP_V2)
+
+        CgroupV1();
+    };
+
+    class CgroupV2: public lrun::Cgroup {
+    public:
         /**
-         * only cgroup v1 have subsystems.
+         * get cgroup mounted path
+         * @param   create_on_need  mount cgroup if not mounted
+         * @return  cgroup mounted path (first one in mount table)
          */
-#endif
+        static std::string base_path(bool create_on_need = true);
+
+        /**
+         * create a cgroup, use existing if possible
+         * @return  Cgroup object
+         */
+        static CgroupV2 create(const std::string& name);
+
+        /**
+         * set a cgroup property
+         * WARNING: property is not filtered, do not pass untrusted user-generated
+         * content here!
+         *
+         * @param   property    property
+         * @param   value       value
+         * @return  0           success
+         *         <0           failed
+         */
+        int set(const std::string &property, const std::string &value);
+
+        /**
+         * get property
+         * @param   property    property
+         * @param   max_length  max length to read (not include '\0')
+         * @return  string      readed property, empty if fail
+         */
+        std::string get(const std::string &property, size_t max_length = 255) const;
+
+        /**
+         * configure a cgroup with multiple options
+         * generally for initialization
+         */
+        int configure(std::map<std::string, std::string> cgroup_options);
+
+    protected:
+        std::string lock_path() const override;
+        bool valid() const override;
+        void update_output_count() override;
+        long long output_usage() const override;
+        std::list<pid_t> get_pids() override;
+        bool has_pid(pid_t pid) override;
+        int freeze(bool freeze = true, int timeout = 5) override;
+        int empty() override;
+        void killall(bool confirm = true) override;
+        int destroy() override;
+        int attach(pid_t pid) override;
+        int limit_devices() override;
+        int reset_usages() override;
+        int reset_cpu_usage() override;
+        double cpu_usage() const override;
+        long long memory_current() const override;
+        long long memory_peak() const override;
+        long long memory_limit() const override;
+        bool is_under_oom() const override;
+        long long set_memory_limit(long long bytes) override;
+        pid_t spawn(lrun::Cgroup::spawn_arg &arg) override;
+    private:
+        /**
+         * @return  1           exist
+         *          0           not exist
+         */
+        static int exists(const std::string &name);
+
+        /**
+        * @param   name        group name
+        * @return  full path   "#{path_}/#{name}"
+        */
+        static std::string path_from_name(const std::string &name);
+
+        /**
+         * @return full path of group
+         */
+        std::string group_path() const;
+
+        /**
+         * set a cgroup property to the same value as parent
+         * @param   property    property
+         * @return  0           success
+         *         <0           failed
+         */
+        int inherit(const std::string &property);
+
+        CgroupV2();
+    };
+
+    class CgroupFactory {
+    private:
+        static int cg_version_;
+    public:
+        static int cg_version();
+        static std::unique_ptr<Cgroup> create(const std::string &name);
     };
 }

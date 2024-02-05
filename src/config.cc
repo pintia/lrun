@@ -212,29 +212,31 @@ void MainConfig::check() {
                     "Non-root users cannot set a negative value of `--nice`");
         }
 
-        if (!this->cgroup_options.empty()) {
+        if (!this->cgroup_v1_options.empty()) {
             error_messages.push_back(
-                    "Non-root users cannot use `--cgroup-option`");
+                    "Non-root users cannot use `--cgroup-v1-option`");
         }
 
-#ifdef CGROUP_V1
-        FOR_EACH(p, this->cgroup_options) {
+        FOR_EACH(p, this->cgroup_v1_options) {
             const string& key = p.first.second;
             if (key.find("..") != string::npos || key.find("/") != string::npos) {
                 error_messages.push_back(
                         "Invalid cgroup option key: `" + key + "`");
             }
         }
-#endif
-#ifdef CGROUP_V2
-        FOR_EACH(p, this->cgroup_options) {
+
+        if (!this->cgroup_v2_options.empty()) {
+            error_messages.push_back(
+                    "Non-root users cannot use `--cgroup-v2-option`");
+        }
+
+        FOR_EACH(p, this->cgroup_v2_options) {
             const string& key = p.first;
             if (key.find("..") != string::npos || key.find("/") != string::npos) {
                 error_messages.push_back(
                         "Invalid cgroup option key: `" + key + "`");
             }
         }
-#endif
     }
 
     if (this->arg.syscall_list.empty() && this->arg.syscall_action == seccomp::action_t::DEFAULT_EPERM) {

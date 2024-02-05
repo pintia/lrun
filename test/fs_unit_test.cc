@@ -86,7 +86,7 @@ TESTCASE(is_accessible) {
     CHECK(fs::is_accessible(TMP "/_a1", R_OK, TMP));
     CHECK(!fs::is_accessible(TMP "/_an", R_OK, TMP));
     CHECK(fs::is_accessible("/dev/null", W_OK));
-    CHECK(fs::is_accessible("/usr/bin/env", R_OK));
+    CHECK(fs::is_accessible("/bin/bash", R_OK));
     CHECK(!fs::is_accessible("/proc/self/io", W_OK));
     CHECK(!fs::is_accessible("/proc/self/io", X_OK));
     CHECK(fs::is_accessible(TMP, X_OK));
@@ -216,7 +216,7 @@ TESTCASE(mount_tmpfs) {
         // write test
         CHECK(system("echo hello > " TMP "/_mt/ee") == 0);
         // size limit test
-        CHECK(system("cat /usr/bin/env >> " TMP "/_mt/ee 2>/dev/null") != 0);
+        CHECK(system("cat /bin/bash >> " TMP "/_mt/ee 2>/dev/null") != 0);
         system("umount " TMP "/_mt");
         // file should disapper after umount
         CHECK(system("test -e " TMP "/_mt/ee") != 0);
@@ -246,6 +246,6 @@ TESTCASE(is_dir) {
     CHECK(fs::is_dir("/"));
     CHECK(!fs::is_dir("/proc1/self"));
     CHECK(!fs::is_dir(""));
-    CHECK(!fs::is_dir("/usr/bin/env"));
+    CHECK(!fs::is_dir("/bin/bash"));
     CHECK(!fs::is_dir("/bin/ping"));
 }

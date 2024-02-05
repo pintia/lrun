@@ -1,5 +1,5 @@
 BINARIES=fs_unit_test cgroup_unit_test strconv_unit_test integration_test
-CXXFLAGS=-I../src -g -std=c++0x -Wall -DCGROUP_VERSION=2
+CXXFLAGS=-I../src -g -std=c++17 -Wall -DCGROUP_VERSION=2
 LD_SECCOMP_FLAGS=`pkg-config --libs --silence-errors libseccomp`
 LD=g++
 
@@ -10,7 +10,7 @@ all: $(BINARIES)
 fs_unit_test:  test.o ../src/utils/fs.o fs_unit_test.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
-cgroup_unit_test: test.o ../src/cgroup.o ../src/utils/strconv.o ../src/utils/fs.o ../src/utils/now.o ../src/utils/log.o ../src/seccomp.o cgroup_unit_test.o
+cgroup_unit_test: test.o ../src/cgroup.o ../src/cgroup_factory.o ../src/cgroupv1.o ../src/cgroupv2.o ../src/utils/strconv.o ../src/utils/fs.o ../src/utils/now.o ../src/utils/log.o ../src/seccomp.o cgroup_unit_test.o
 	$(LD) -pthread $(LDFLAGS) $^ $(LD_SECCOMP_FLAGS) -o $@
 
 strconv_unit_test: test.o ../src/utils/strconv.o strconv_unit_test.o
