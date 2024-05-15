@@ -163,7 +163,7 @@ CgroupV1 CgroupV1::create(const string& name) {
     return cg;
 }
 
-CgroupV1::CgroupV1() { version_ = 1; };
+CgroupV1::CgroupV1() { version_ = 1; }
 
 bool CgroupV1::valid() const {
     return !name_.empty() && exists(name_);

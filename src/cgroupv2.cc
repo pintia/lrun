@@ -97,8 +97,6 @@ string CgroupV2::base_path(bool create_on_need) {
     int e = mount(MNT_SRC_NAME, dest_path.c_str(), fs::TYPE_CGROUP2, MS_NOEXEC | MS_NOSUID | MS_RELATIME | MS_NODEV, "nsdelegate,memory_recursiveprot");
 
     if (e != 0) {
-        int last_err = errno;
-        errno = last_err;
         FATAL("can not mount cgroup v2 '%s'", dest_path.c_str());
     }
     return dest_path;
