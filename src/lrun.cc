@@ -106,7 +106,6 @@ static void signal_handler(int signal) {
 # ifndef NLIBSEGFAULT
 // compile with -ldl
 #include <dlfcn.h>
-#include <thread>
 
 static struct LibSegFaultLoader {
     LibSegFaultLoader() {

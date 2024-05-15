@@ -106,21 +106,6 @@ def get_version
     end
 end
 
-def get_cgroup_version
-  @cgroup_version ||= \
-    begin
-      sh 'mount -l | grep "/sys/fs/cgroup type cgroup2"' do |ok, res|
-        if !ok
-          puts "cgroup v1"
-          1
-        else
-          puts "cgroup v2"
-          2
-        end
-      end
-    end
-end
-
 def get_libseccomp_version
   @libseccomp_version ||=\
     begin
@@ -188,7 +173,6 @@ rule '.o' => '.cc' do |t|
            '-fPIC',
            CXXFLAGS, NODEBUG_FLAG, NOLIBSF_FLAG,
            "-DLIBSECCOMP_VERSION_MAJOR=#{get_libseccomp_version}",
-           "-DCGROUP_VERSION=#{get_cgroup_version}",
            "-DVERSION=\\\"#{get_version}\\\"",
            get_libseccomp_cflags].join(' ')
   require_executable! CXX

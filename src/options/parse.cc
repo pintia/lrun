@@ -21,7 +21,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
-#include <thread>
 #include "../utils/strconv.h"
 #include "../utils/fs.h"
 #include "options.h"

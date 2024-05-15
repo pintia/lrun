@@ -20,28 +20,6 @@
 // THE SOFTWARE.
 ////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2017-2024 Shaolei Zhou <zhoushaolei@pat-edu.com>
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-////////////////////////////////////////////////////////////////////////////////
-
 #include <cstdio>
 #include <cstring>
 #include <list>
@@ -97,8 +75,6 @@ string CgroupV2::base_path(bool create_on_need) {
     int e = mount(MNT_SRC_NAME, dest_path.c_str(), fs::TYPE_CGROUP2, MS_NOEXEC | MS_NOSUID | MS_RELATIME | MS_NODEV, "nsdelegate,memory_recursiveprot");
 
     if (e != 0) {
-        int last_err = errno;
-        errno = last_err;
         FATAL("can not mount cgroup v2 '%s'", dest_path.c_str());
     }
     return dest_path;
@@ -407,7 +383,7 @@ long long CgroupV2::memory_limit() const {
 }
 
 bool CgroupV2::is_under_oom() const {
-    string content = get( "memory.events");
+    string content = get("memory.events");
     string sub_content = content.substr(content.find("oom "));
     int count;
     if (sscanf(sub_content.c_str(), "oom %d", &count) == 0) return false;

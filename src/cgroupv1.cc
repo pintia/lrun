@@ -163,7 +163,7 @@ CgroupV1 CgroupV1::create(const string& name) {
     return cg;
 }
 
-CgroupV1::CgroupV1() { version_ = 1; };
+CgroupV1::CgroupV1() { version_ = 1; }
 
 bool CgroupV1::valid() const {
     return !name_.empty() && exists(name_);
@@ -347,11 +347,11 @@ int CgroupV1::inherit(subsys_id_t subsys_id, const string& property) {
 
 int CgroupV1::configure(std::map<std::pair<CgroupV1::subsys_id_t, std::string>, std::string> cgroup_options) {
     // some cgroup options, fail quietly
-    set(CgroupV1::CG_MEMORY, "memory.swappiness", "0");
+    set(CgroupV1::CG_MEMORY, "memory.swappiness", "0\n");
 
     // enable oom killer now so our buggy code won't freeze.
     // we will disable it later.
-    set(CgroupV1::CG_MEMORY, "memory.oom_control", "0");
+    set(CgroupV1::CG_MEMORY, "memory.oom_control", "0\n");
 
     // other cgroup options
     FOR_EACH(p, cgroup_options) {

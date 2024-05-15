@@ -35,12 +35,6 @@
 #define RLIMIT_RTTIME RLIMIT_NLIMITS
 #endif
 
-#if defined(CGROUP_VERSION) && CGROUP_VERSION == 2
-#define CGROUP_V2
-#else
-#define CGROUP_V1
-#endif
-
 namespace lrun {
     class Cgroup;
 

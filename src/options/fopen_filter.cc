@@ -31,7 +31,6 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <thread>
 #include "options.h"
 #include "../utils/ensure.h"
 #include "../utils/fs.h"
@@ -233,6 +232,7 @@ static inline int do_mark_paths() {
     for (size_t i = 0; i < conditions.size(); ++i) {
         int mark_flag = conditions[i]->get_mark_flags();
         std::string path = conditions[i]->get_mark_path();
+
         if (!path.empty()) {
             int ret = tracer->mark(path.c_str(), mark_flag | FAN_MARK_ADD, FAN_OPEN_PERM);
             if (ret != 0) {
