@@ -328,6 +328,9 @@ static int run_command() {
             break;
         }
 
+        /** process's exit code after it becomes zombie is not ready for get
+          * so currently comment out these code, just wait for exit
+
         // in case SIGCHILD is unreliable
         // check zombie manually here instead of waiting SIGCHILD
         if (get_process_state(pid) == 'Z') {
@@ -340,6 +343,8 @@ static int run_command() {
                 clean_cg_exit(cg, 6);
             }
         }
+
+        */
 
         if (config.output_limit > 0) {
             cg.update_output_count();
