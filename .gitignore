@@ -9,6 +9,7 @@ test/[a-z_]*
 src/lrun
 tools/mirrorfs/mirrorfs
 tools/netns-empty/netns-empty
+tools/netns-empty-lo/netns-empty-lo
 *.so
 
 # include sources
@@ -16,3 +17,6 @@ tools/netns-empty/netns-empty
 !*.h
 !*.rb
 !Makefile
+
+.direnv/
+.idea

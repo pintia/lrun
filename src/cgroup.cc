@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <climits>
 #include "cgroup.h"
 #include "utils/linux_only.h"
 #include "utils/for_each.h"
@@ -48,12 +49,18 @@ using namespace lrun;
 using std::string;
 using std::list;
 
+#if defined(CGROUP_V1)
 const char Cgroup::subsys_names[4][8] = {
     "cpuacct",
     "memory",
     "devices",
     "freezer",
 };
+#elif defined(CGROUP_V2)
+/**
+ * only cgroup v1 have subsystems.
+ */
+#endif
 
 static struct {
     const char *name;
@@ -67,6 +74,7 @@ static struct {
     {"urandom", 9},
 };
 
+#if defined(CGROUP_V1)
 std::string Cgroup::subsys_base_paths_[sizeof(subsys_names) / sizeof(subsys_names[0])];
 
 int Cgroup::subsys_id_from_name(const char * const name) {
@@ -75,8 +83,15 @@ int Cgroup::subsys_id_from_name(const char * const name) {
     }
     return -1;
 }
+#elif defined(CGROUP_V2)
+#endif
 
+#if defined(CGROUP_V1)
 string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
+#elif defined(CGROUP_V2)
+string Cgroup::base_path(bool create_on_need) {
+#endif
+#if defined(CGROUP_V1)
     {
         // FIXME cache may not work when user manually umount cgroup
         // check last cached path
@@ -133,21 +148,74 @@ string Cgroup::base_path(subsys_id_t subsys_id, bool create_on_need) {
     }
 
     return (subsys_base_paths_[subsys_id] = dest_path);
+#elif defined(CGROUP_V2)
+    const char * const MNT_SRC_NAME = "cgroup_lrun";
+    const char * MNT_DEST_BASE_PATH = "/sys/fs/cgroup";
+
+    std::map<string, fs::MountEntry> mounts = fs::get_mounts();
+    FOR_EACH_CONST(p, mounts) {
+        const fs::MountEntry& ent = p.second;
+        if (ent.type != string(fs::TYPE_CGROUP2)) continue;
+        return ent.dir;
+    }
+
+    // no cgroups mounted, prepare one
+    if (!create_on_need) return "";
+
+    if (!fs::is_dir(MNT_DEST_BASE_PATH)) {
+        // no /sys/fs/cgroup in system, try conservative location
+        MNT_DEST_BASE_PATH = "/cgroup";
+        mkdir(MNT_DEST_BASE_PATH, 0700);
+    }
+
+    // create and mount cgroup at dest_path
+    string dest_path = string(MNT_DEST_BASE_PATH);
+    INFO("mkdir and mounting '%s'", dest_path.c_str());
+    mkdir(dest_path.c_str(), 0700);
+    /**
+     * TODO: there should be additional flag: nsdelegate,memory_recursiveprot
+     * I don't know whether it is correct putting them in data.
+     */
+    int e = mount(MNT_SRC_NAME, dest_path.c_str(), fs::TYPE_CGROUP2, MS_NOEXEC | MS_NOSUID | MS_RELATIME | MS_NODEV, "nsdelegate,memory_recursiveprot");
+
+    if (e != 0) {
+        int last_err = errno;
+        errno = last_err;
+        FATAL("can not mount cgroup v2 '%s'", dest_path.c_str());
+    }
+    return dest_path;
+#endif
 }
 
+#if defined(CGROUP_V1)
 string Cgroup::path_from_name(subsys_id_t subsys_id, const string& name) {
     return base_path(subsys_id) + "/" + name;
 }
+#elif defined(CGROUP_V2)
+string Cgroup::path_from_name(const string& name) {
+    return base_path() + "/" + name;
+}
+#endif
 
+#if defined(CGROUP_V1)
 string Cgroup::subsys_path(Cgroup::subsys_id_t subsys_id) const {
     return path_from_name(subsys_id, name_);
 }
-
+#elif defined(CGROUP_V2)
+string Cgroup::group_path() const {
+    return path_from_name(name_);
+}
+#endif
 
 int Cgroup::exists(const string& name) {
+#if defined(CGROUP_V1)
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
         if (!fs::is_dir(path_from_name((subsys_id_t)(id), name))) return false;
     }
+#elif defined(CGROUP_V2)
+    if (!fs::is_dir(path_from_name(name))) return false;
+
+#endif
     return true;
 }
 
@@ -159,8 +227,8 @@ Cgroup Cgroup::create(const string& name) {
         cg.name_ = name;
         return cg;
     }
-
     int success = 1;
+#if defined(CGROUP_V1)
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
         string path = path_from_name((subsys_id_t)id, name);
         if (fs::is_dir(path)) continue;
@@ -170,7 +238,13 @@ Cgroup Cgroup::create(const string& name) {
             break;
         }
     }
-
+#elif defined(CGROUP_V2)
+    string path = path_from_name(name);
+    if (mkdir(path.c_str(), 0700)) {
+        ERROR("mkdir '%s': failed", path.c_str());
+        success = 0;
+    }
+#endif
     if (success) cg.name_ = name;
     cg.init_pid_ = 0;
 
@@ -185,8 +259,11 @@ bool Cgroup::valid() const {
 
 void Cgroup::update_output_count() {
     if (!valid()) return;
+#if defined(CGROUP_V1)
     string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
-
+#elif defined(CGROUP_V2)
+    string procs_path = group_path() + "/cgroup.procs";
+#endif
     if (fs::read(procs_path, 4).empty()) return;
 
     FILE * procs = fopen(procs_path.c_str(), "r");
@@ -216,7 +293,11 @@ long long Cgroup::output_usage() const {
 }
 
 list<pid_t> Cgroup::get_pids() {
+#if defined(CGROUP_V1)
     string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
+#elif defined(CGROUP_V2)
+    string procs_path = group_path() + "/cgroup.procs";
+#endif
     FILE * procs = fopen(procs_path.c_str(), "r");
     list<pid_t> pids;
 
@@ -240,9 +321,15 @@ bool Cgroup::has_pid(pid_t pid) {
     char *line = NULL;
     char buf[64];  // FIXME cgroup name is 63 chars long
     while (getline(&line, &len, fp) != -1) {
+#if defined(CGROUP_V1)
         // the line should look like:
         // 4:memory:/cgname
         if (sscanf(line, "%*d:memory:/%63s", buf) != 1)
+#elif defined(CGROUP_V2)
+        // the line should look like:
+        // 0::/cgname
+        if (sscanf(line, "%*d::/%63s", buf) != 1)
+#endif
             continue;
         result = (strncmp(name_.c_str(), buf, sizeof(buf)) == 0);
         break;
@@ -255,6 +342,7 @@ bool Cgroup::has_pid(pid_t pid) {
 static const useconds_t LOOP_ITERATION_INTERVAL = 10000;  // 10 ms
 
 int Cgroup::freeze(bool freeze, int timeout) {
+#if defined(CGROUP_V1)
     if (!valid()) return -1;
     string freeze_state_path = subsys_path(CG_FREEZER) + "/freezer.state";
 
@@ -283,11 +371,42 @@ int Cgroup::freeze(bool freeze, int timeout) {
         INFO("confirmed frozen");
     }
     return 0;
+#elif defined(CGROUP_V2)
+    if (!valid()) return -1;
+    string freeze_state_path = group_path() + "/cgroup.freeze";
+
+    if (!freeze) {
+        INFO("unfreeze");
+        fs::write(freeze_state_path, "0\n");
+    } else {
+        INFO("freezing");
+        fs::write(freeze_state_path, "1\n");
+
+        for (;;) {
+            int frozen = (strncmp(fs::read(freeze_state_path, 4).c_str(), "1", 3) == 0);
+            if (frozen) break;
+
+            timeout--;
+            if (timeout <= 0) {
+                INFO("giving up, not frozen");
+                return -2;
+            }
+
+            usleep(LOOP_ITERATION_INTERVAL);
+        }
+        INFO("confirmed frozen");
+    }
+    return 0;
+#endif
 }
 
 int Cgroup::empty() {
+#if defined(CGROUP_V1)
     string procs_path = subsys_path(CG_FREEZER) + "/cgroup.procs";
+#elif defined(CGROUP_V2)
+    string procs_path = group_path() + "/cgroup.procs";
     return fs::read(procs_path, 4).empty() ? 1 : 0;
+#endif
 }
 
 void Cgroup::killall(bool confirm) {
@@ -337,15 +456,20 @@ int Cgroup::destroy() {
     killall();
 
     int ret = 0;
+#if defined(CGROUP_V1)
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
         string path = subsys_path((subsys_id_t)id);
         if (path.empty()) continue;
         if (fs::is_dir(path)) ret |= rmdir(path.c_str());
     }
+#elif defined(CGROUP_V2)
+    if (fs::is_dir(group_path())) ret |= rmdir(group_path().c_str());
+#endif
 
     return ret;
 }
 
+#if defined(CGROUP_V1)
 int Cgroup::set(subsys_id_t subsys_id, const string& property, const string& value) {
     INFO("set cgroup %s/%s to %s", subsys_path(subsys_id).c_str(), property.c_str(), value.c_str());
     return fs::write(subsys_path(subsys_id) + "/" + property, value);
@@ -359,73 +483,156 @@ int Cgroup::inherit(subsys_id_t subsys_id, const string& property) {
     string value = fs::read(base_path(subsys_id, false) + "/" + property);
     return fs::write(subsys_path(subsys_id) + "/" + property, value);
 }
+#elif defined(CGROUP_V2)
+int Cgroup::set(const string& property, const string& value) {
+    INFO("set cgroup %s to %s", property.c_str(), value.c_str());
+    return fs::write(group_path() + "/" + property, value);
+}
+
+string Cgroup::get(const string& property, size_t max_length) const {
+    return fs::read(group_path() + "/" + property, max_length);
+}
+
+int Cgroup::inherit(const string& property) {
+    string value = fs::read(base_path(false) + "/" + property);
+    return fs::write(group_path() + "/" + property, value);
+}
+#endif
 
 int Cgroup::attach(pid_t pid) {
     char pidbuf[32];
     snprintf(pidbuf, sizeof(pidbuf), "%lu\n", (unsigned long)pid);
 
     int ret = 0;
+#if defined(CGROUP_V1)
     for (int id = 0; id < SUBSYS_COUNT; ++id) {
         string path = subsys_path((subsys_id_t)id);
+        // FIXME: It seems pid should be write into /cgroup.procs and tid should be write into /tasks
         ret |= fs::write(path + "/tasks", pidbuf);
     }
+#elif defined(CGROUP_V2)
+    ret |= fs::write(group_path() + "/cgroup.procs", pidbuf);
+#endif
 
     return ret;
 }
 
 int Cgroup::limit_devices() {
     int e = 0;
+#if defined(CGROUP_V1)
     e += set(CG_DEVICES, "devices.deny", "a");
     for (size_t i = 0; i < sizeof(basic_devices) / sizeof(basic_devices[0]); ++i) {
         long minor = basic_devices[i].minor;
         string v = string("c 1:" + strconv::from_long(minor) + " rwm");
         e += set(CG_DEVICES, "devices.allow", v);
     }
+#elif defined(CGROUP_V2)
+    /**
+     * cgroup v2 not support limit devices by default:
+     *      Cgroup v2 device controller has no interface files and is implemented
+     *      on top of cgroup BPF. To control access to device files, a user may
+     *      create bpf programs of the BPF_CGROUP_DEVICE type and attach them
+     */
+#endif
     return e ? -1 : 0;
 }
 
 int Cgroup::reset_usages() {
     int e = 0;
+#if defined(CGROUP_V1)
     e += set(CG_CPUACCT, "cpuacct.usage", "0");
     e += set(CG_MEMORY, "memory.max_usage_in_bytes", "0") * set(CG_MEMORY, "memory.memsw.max_usage_in_bytes", "0");
     output_counter_.clear();
+#elif defined(CGROUP_V2)
+    /**
+     * cgroup v2 seems not support reset status
+     */
+#endif
     return e ? -1 : 0;
 }
 
 int Cgroup::reset_cpu_usage() {
     int e = 0;
+#if defined(CGROUP_V1)
     e = set(CG_CPUACCT, "cpuacct.usage", "0");
+#elif defined(CGROUP_V2)
+    /**
+     * cgroup v2 seems not support reset status
+     */
+#endif
     return e ? -1 : 0;
 }
 
 double Cgroup::cpu_usage() const {
+#if defined(CGROUP_V1)
     string cpu_usage = get(CG_CPUACCT, "cpuacct.usage", 31);
     // convert from nanoseconds to seconds
     return strconv::to_double(cpu_usage) / 1e9;
+#elif defined(CGROUP_V2)
+    char cpu_usage[32];
+    string content = get("cpu.stat", 32);
+    if (sscanf(content.c_str(), "usage_usec %31s", cpu_usage) == 0) {
+        return 0.0;
+    }
+    // convert from useconds(microseconds) to seconds
+    return strconv::to_double(cpu_usage) / 1e6;
+#endif
 }
 
 long long Cgroup::memory_current() const {
+#if defined(CGROUP_V1)
     string usage = get(CG_MEMORY, "memory.memsw.usage_in_bytes");
     if (usage.empty()) usage = get(CG_MEMORY, "memory.usage_in_bytes");
     return strconv::to_longlong(usage);
+#elif defined(CGROUP_V2)
+    string usage = get("memory.current");
+    /**
+     * in cgroup v2, there is no memory.swap.peak.
+     * so we do not count swap usage currently.
+     */
+    // string swap_usage = get("memory.swap.current");
+    // return strconv::to_longlong(usage) + strconv::to_longlong(swap_usage);
+    return strconv::to_longlong(usage);
+#endif
 }
 
 long long Cgroup::memory_peak() const {
+#if defined(CGROUP_V1)
     string usage = get(CG_MEMORY, "memory.memsw.max_usage_in_bytes");
     if (usage.empty()) usage = get(CG_MEMORY, "memory.max_usage_in_bytes");
+#elif defined(CGROUP_V2)
+    /**
+     * in cgroup v2, there is no memory.swap.peak.
+     * so we do not count swap usage currently.
+     */
+    string usage = get("memory.peak");
+    return strconv::to_longlong(usage);
+#endif
     return strconv::to_longlong(usage);
 }
 
 long long Cgroup::memory_limit() const {
+#if defined(CGROUP_V1)
     string limit = get(CG_MEMORY, "memory.memsw.limit_in_bytes");
     if (limit.empty()) limit = get(CG_MEMORY, "memory.limit_in_bytes");
+#elif defined(CGROUP_V2)
+    string limit = get("memory.max");
+    if (strcmp(limit.c_str(), "max") == 0) return LLONG_MAX;
+#endif
     return strconv::to_longlong(limit);
 }
 
 bool Cgroup::is_under_oom() const {
+#if defined(CGROUP_V1)
     string content = get(CG_MEMORY, "memory.oom_control");
     return content.find("under_oom 1") != string::npos;
-
+#elif defined(CGROUP_V2)
+    string content = get( "memory.events");
+    string sub_content = content.substr(content.find("oom "));
+    int count;
+    if (sscanf(sub_content.c_str(), "oom %d", &count) == 0) return false;
+    return count > 0;
+#endif
 }
 
 long long Cgroup::set_memory_limit(long long bytes) {
@@ -433,18 +640,30 @@ long long Cgroup::set_memory_limit(long long bytes) {
 
     if (bytes <= 0) {
         // read base (parent) cgroup properties
+#if defined(CGROUP_V1)
         e *= inherit(CG_MEMORY, "memory.limit_in_bytes");
         e *= inherit(CG_MEMORY, "memory.memsw.limit_in_bytes");
+#elif defined(CGROUP_V2)
+        e *= inherit("memory.max");
+#endif
     } else {
+#if defined(CGROUP_V1)
         e *= set(CG_MEMORY, "memory.limit_in_bytes", strconv::from_longlong(bytes));
         e *= set(CG_MEMORY, "memory.memsw.limit_in_bytes", strconv::from_longlong(bytes));
+#elif defined(CGROUP_V2)
+        e *= set("memory.max", strconv::from_longlong(bytes));
+#endif
     }
 
     if (e) {
         return -1;
     } else {
         // The kernel might "adjust" the memory limit. Read it back.
+#if defined(CGROUP_V1)
         string limit = get(CG_MEMORY, "memory.memsw.limit_in_bytes");
+#elif defined(CGROUP_V2)
+        string limit = get("memory.max");
+#endif
         return strconv::to_longlong(limit);
     }
 }
@@ -1219,6 +1438,7 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
         goto cleanup;
     }
 
+#if defined(CGROUP_V1)
     // the child has exec successfully
     // disable oom killer because it will make dmesg noisy.
     // Note: a process can enter D (uninterruptable sleep) status
@@ -1226,9 +1446,13 @@ pid_t Cgroup::spawn(spawn_arg& arg) {
     // or enlarge memory limit
     INFO("disabling oom killer");
     if (set(CG_MEMORY, "memory.oom_control", "1\n")) INFO("can not set memory.oom_control");
+#elif defined(CGROUP_V2)
+    /**
+     * oom kill disable is not available for cgroup v2.
+     */
+#endif
 
 cleanup:
     close(arg.sockets[1]);
     return child_pid;
 }
-

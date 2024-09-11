@@ -21,6 +21,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
+#include <thread>
 #include "../utils/strconv.h"
 #include "../utils/fs.h"
 #include "options.h"
@@ -241,6 +242,7 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
             long long bytes = strconv::to_bytes(NEXT_STRING_ARG);
             config.arg.tmpfs_list.push_back(make_pair(path, bytes));
         } else if (option == "cgroup-option") {
+#ifdef CGROUP_V1
             REQUIRE_NARGV(3);
             string subsys_name = NEXT_STRING_ARG;
             string key = NEXT_STRING_ARG;
@@ -258,6 +260,18 @@ void lrun::options::parse(int argc, char * argv[], lrun::MainConfig& config) {
                         "subsystem '%s' not found",
                         key.c_str(), value.c_str(), subsys_name.c_str());
             }
+#endif
+#ifdef CGROUP_V2
+            REQUIRE_NARGV(2);
+            string key = NEXT_STRING_ARG;
+            string value = NEXT_STRING_ARG;
+            if (key.find("..") != string::npos || key.find('/') != string::npos) {
+                WARNING("unsafe cgroup option '%s' = '%s' ignored",
+                        key.c_str(), value.c_str());
+            } else {
+                config.cgroup_options[key] = value;
+            }
+#endif
         } else if (option == "env") {
             REQUIRE_NARGV(2);
             string key = NEXT_STRING_ARG;

@@ -1,5 +1,5 @@
 BINARIES=fs_unit_test cgroup_unit_test strconv_unit_test integration_test
-CXXFLAGS=-I../src -g -std=c++0x -Wall
+CXXFLAGS=-I../src -g -std=c++0x -Wall -DCGROUP_VERSION=2
 LD_SECCOMP_FLAGS=`pkg-config --libs --silence-errors libseccomp`
 LD=g++
 
