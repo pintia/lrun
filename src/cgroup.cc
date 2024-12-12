@@ -49,21 +49,17 @@ using namespace lrun;
 using std::string;
 using std::list;
 
-static struct {
-    const char *name;
-    unsigned int minor;
-    // major is missing because all basic_devices have major = 1
-} basic_devices[] = {
-    {"null", 3},
-    {"zero", 5},
-    {"full", 7},
-    {"random", 8},
-    {"urandom", 9},
+Device lrun::basic_devices[] = {
+        {"null",    3},
+        {"zero",    5},
+        {"full",    7},
+        {"random",  8},
+        {"urandom", 9},
 };
 
 // following functions are called by clone_main_fn
 
-__attribute__((unused)) static void do_set_sysctl() {
+__attribute__((unused)) void lrun::do_set_sysctl() {
     INFO("set sysctl settings");
     // skip slow oom scaning and do not write syslog
     fs::write("/proc/sys/vm/oom_kill_allocating_task", "1\n");
@@ -72,7 +68,7 @@ __attribute__((unused)) static void do_set_sysctl() {
     fs::write("/proc/sys/kernel/dmesg_restrict", "1\n");
 }
 
-static void do_privatize_filesystem(__attribute__((unused)) const Cgroup::spawn_arg& arg) {
+void lrun::do_privatize_filesystem(__attribute__((unused)) const Cgroup::spawn_arg& arg) {
     // make sure filesystem not be shared
     // ignore this step for old systems without these features
     int type = MS_PRIVATE | MS_REC;
@@ -81,7 +77,7 @@ static void do_privatize_filesystem(__attribute__((unused)) const Cgroup::spawn_
     }
 }
 
-static void do_remounts(const Cgroup::spawn_arg& arg) {
+void lrun::do_remounts(const Cgroup::spawn_arg& arg) {
     FOR_EACH(p, arg.remount_list) {
         const string& dest = p.first;
         unsigned long flags = p.second;
@@ -98,7 +94,7 @@ static void do_remounts(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_mount_bindfs(const Cgroup::spawn_arg& arg) {
+void lrun::do_mount_bindfs(const Cgroup::spawn_arg& arg) {
     // bind fs mounts
     FOR_EACH(p, arg.bindfs_list) {
         const string& dest = p.first;
@@ -111,7 +107,7 @@ static void do_mount_bindfs(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_chroot(const Cgroup::spawn_arg& arg) {
+void lrun::do_chroot(const Cgroup::spawn_arg& arg) {
     // chroot to a prepared place
     if (!arg.chroot_path.empty()) {
         const string& path = arg.chroot_path;
@@ -123,7 +119,7 @@ static void do_chroot(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
+void lrun::do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
     if (!arg.umount_outside) return;
     if (arg.chroot_path.empty()) return;
 
@@ -145,12 +141,12 @@ static void do_umount_outside_chroot(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static bool should_mount_proc(const Cgroup::spawn_arg& arg) {
+bool lrun::should_mount_proc(const Cgroup::spawn_arg& arg) {
     if (!fs::is_accessible(fs::join(arg.chroot_path, fs::PROC_PATH), X_OK)) return false;
     return (arg.clone_flags & CLONE_NEWPID) != 0 || !arg.chroot_path.empty();
 }
 
-static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
+bool lrun::should_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if (!should_mount_proc(arg)) return false;
 
     // currently there is no option about this behavior
@@ -160,7 +156,7 @@ static bool should_hide_sensitive(const Cgroup::spawn_arg& arg) {
     return true;
 }
 
-static const char * get_proc_fs_type(const Cgroup::spawn_arg& arg) {
+const char * lrun::get_proc_fs_type(const Cgroup::spawn_arg& arg) {
     // use "liteproc" when possible
     static const char proc_fs[] = "proc";
     static const char liteproc_fs[] = "liteproc";
@@ -175,7 +171,7 @@ static const char * get_proc_fs_type(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_mount_proc(const Cgroup::spawn_arg& arg) {
+void lrun::do_mount_proc(const Cgroup::spawn_arg& arg) {
     // mount /proc if pid namespace is enabled and the directory exists
     if (!should_mount_proc(arg)) return;
     string dest = fs::join(arg.chroot_path, fs::PROC_PATH);
@@ -186,7 +182,7 @@ static void do_mount_proc(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
+void lrun::do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     if (!should_hide_sensitive(arg)) return;
     string proc_sys_path = fs::join(arg.chroot_path, "/proc/sys");
     if (fs::is_accessible(proc_sys_path, X_OK)) {
@@ -194,7 +190,7 @@ static void do_hide_sensitive(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static list<int> get_fds() {
+list<int> lrun::get_fds() {
     list<int> fds;
 
     struct dirent **namelist = 0;
@@ -216,7 +212,7 @@ static list<int> get_fds() {
     return fds;
 }
 
-static void do_set_uts(const Cgroup::spawn_arg& arg) {
+void lrun::do_set_uts(const Cgroup::spawn_arg& arg) {
     int e;
     if (!arg.uts.domainname.empty()) {
         INFO("setdomainname: %s", arg.uts.domainname.c_str());
@@ -256,7 +252,7 @@ static void do_set_uts(const Cgroup::spawn_arg& arg) {
     // [[[end]]]
 }
 
-static void do_set_netns(const Cgroup::spawn_arg& arg) {
+void lrun::do_set_netns(const Cgroup::spawn_arg& arg) {
     if (arg.netns_fd == -1) return;
 
     INFO("set netns")
@@ -267,7 +263,7 @@ static void do_set_netns(const Cgroup::spawn_arg& arg) {
     };
 }
 
-static void do_fd_redirect(int fd_dst, int fd_src) {
+void lrun::do_fd_redirect(int fd_dst, int fd_src) {
     if (fd_src >= 0 && fd_src != fd_dst) {
         INFO("dup2 %d %d", fd_src, fd_dst);
         int ret = dup2(fd_src, fd_dst);
@@ -277,7 +273,7 @@ static void do_fd_redirect(int fd_dst, int fd_src) {
     }
 }
 
-static void fd_set_cloexec(int fd, int enforce = 1) {
+void lrun::fd_set_cloexec(int fd, int enforce) {
     if (fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC)) {
         if (enforce) {
             FATAL("fcntl %d failed", fd);
@@ -288,7 +284,7 @@ static void fd_set_cloexec(int fd, int enforce = 1) {
     }
 }
 
-static void do_process_fds(const Cgroup::spawn_arg& arg) {
+void lrun::do_process_fds(const Cgroup::spawn_arg& arg) {
     // this is for parent process
     close(arg.sockets[1]);
 
@@ -312,7 +308,7 @@ static void do_process_fds(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
+void lrun::do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
     // setup other tmpfs mounts
     FOR_EACH(p, arg.tmpfs_list) {
         const char * dest = p.first.c_str();
@@ -333,7 +329,7 @@ static void do_mount_tmpfs(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_remount_dev(const Cgroup::spawn_arg& arg) {
+void lrun::do_remount_dev(const Cgroup::spawn_arg& arg) {
     if (!arg.remount_dev) return;
 
     INFO("remount /dev");
@@ -353,7 +349,7 @@ static void do_remount_dev(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_chdir(const Cgroup::spawn_arg& arg) {
+void lrun::do_chdir(const Cgroup::spawn_arg& arg) {
     // chdir to a specified path
     if (!arg.chdir_path.empty()) {
         const string& path = arg.chdir_path;
@@ -365,7 +361,7 @@ static void do_chdir(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_commands(const Cgroup::spawn_arg& arg) {
+void lrun::do_commands(const Cgroup::spawn_arg& arg) {
     // system commands
     FOR_EACH(cmd, arg.cmd_list) {
         INFO("system %s", cmd.c_str());
@@ -374,7 +370,7 @@ static void do_commands(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_renice(const Cgroup::spawn_arg& arg) {
+void lrun::do_renice(const Cgroup::spawn_arg& arg) {
     // nice
     if (arg.nice) {
         INFO("nice %d", (int)arg.nice);
@@ -384,13 +380,13 @@ static void do_renice(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_set_umask(const Cgroup::spawn_arg& arg) {
+void lrun::do_set_umask(const Cgroup::spawn_arg& arg) {
     // set umask
     INFO("umask %d", arg.umask);
     umask(arg.umask);
 }
 
-static void do_set_uid_gid(const Cgroup::spawn_arg& arg) {
+void lrun::do_set_uid_gid(const Cgroup::spawn_arg& arg) {
     // setup uid, gid
     INFO("setgid %d, setuid %d", (int)arg.gid, (int)arg.uid);
     if (setgid(arg.gid) || setuid(arg.uid)) {
@@ -400,7 +396,7 @@ static void do_set_uid_gid(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
+void lrun::do_apply_rlimits(const Cgroup::spawn_arg& arg) {
     // apply rlimit, note NPROC limit should be applied after setuid
     FOR_EACH(p, arg.rlimits) {
         int resource = p.first;
@@ -453,7 +449,7 @@ static void do_apply_rlimits(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_set_env(const Cgroup::spawn_arg& arg) {
+void lrun::do_set_env(const Cgroup::spawn_arg& arg) {
     // prepare env
     if (arg.reset_env) {
         INFO("reset ENV");
@@ -468,7 +464,7 @@ static void do_set_env(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_seccomp(const Cgroup::spawn_arg& arg) {
+void lrun::do_seccomp(const Cgroup::spawn_arg& arg) {
     // syscall whitelist
     if (seccomp::supported() && arg.syscall_list.length() > 0) {
         // apply seccomp, it will set PR_SET_NO_NEW_PRIVS
@@ -489,7 +485,7 @@ static void do_seccomp(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void do_set_new_privs(const Cgroup::spawn_arg& arg) {
+void lrun::do_set_new_privs(const Cgroup::spawn_arg& arg) {
     #ifndef PR_SET_NO_NEW_PRIVS
     # define PR_SET_NO_NEW_PRIVS 38
     #endif
@@ -513,7 +509,7 @@ static void do_set_new_privs(const Cgroup::spawn_arg& arg) {
     }
 }
 
-static void init_signal_handler(int signal) {
+void lrun::init_signal_handler(int signal) {
     if (signal == SIGCHLD) {
         int status;
         while (waitpid(-1, &status, WNOHANG) > 0);
@@ -522,7 +518,7 @@ static void init_signal_handler(int signal) {
     }
 }
 
-static int clone_init_fn(void *) {
+int lrun::clone_init_fn(void *) {
     // a dummy init process in new pid namespace
     // intended to be killed via SIGKILL from root pid namespace
     prctl(PR_SET_PDEATHSIG, SIGHUP);
@@ -554,13 +550,13 @@ static int clone_init_fn(void *) {
     return 0;
 }
 
-static int clone_main_fn(void * clone_arg) {
+int lrun::clone_main_fn(void *clone_arg) {
     // kill us if parent dies
     prctl(PR_SET_PDEATHSIG, SIGKILL);
 
     // this is executed in child process after clone
     // fs and uid settings should be done here
-    Cgroup::spawn_arg& arg = *(Cgroup::spawn_arg*)clone_arg;
+    Cgroup::spawn_arg &arg = *(Cgroup::spawn_arg *) clone_arg;
 
 #ifdef SYSCTL_PER_NS_WORKS
     // NOTE: Do not uncomment this until sysctl per namespace works.
@@ -593,13 +589,13 @@ static int clone_main_fn(void * clone_arg) {
     INFO("waiting for parent");
     char buf[4];
     int ret = read(arg.sockets[0], buf, sizeof buf);
-    (void)ret;
+    (void) ret;
 
     // let parent know we got the message, parent then can close fd without SIGPIPE child
     INFO("got from parent: '%3s'. notify parent", buf);
     strncpy(buf, "PRE", sizeof buf);
     ret = write(arg.sockets[0], buf, sizeof buf);
-    (void)ret;
+    (void) ret;
 
     // not closing sockets[0] here, it will closed on exec
     // if exec fails, it will be closed upon process exit (aka. this function returns)
@@ -628,16 +624,16 @@ static int clone_main_fn(void * clone_arg) {
     // notify parent that exec failed
     strncpy(buf, "ERR", sizeof buf);
     ret = write(arg.sockets[0], buf, sizeof buf);
-    (void)ret;
+    (void) ret;
 
     // wait parent
     ret = read(arg.sockets[0], buf, sizeof buf);
-    (void)ret;
+    (void) ret;
 
     return -1;
 } // clone_main_fn
 
-static int is_setns_pidns_supported() {
+int lrun::is_setns_pidns_supported() {
     string pidns_path = string(fs::PROC_PATH) + "/self/ns/pid";
     int fd = open(pidns_path.c_str(), O_RDONLY);
     if (fd == -1) return 0;
@@ -646,7 +642,7 @@ static int is_setns_pidns_supported() {
 }
 
 #ifndef NDEBUG
-static string clone_flags_to_str(int clone_flags) {
+string lrun::clone_flags_to_str(int clone_flags) {
     int v = clone_flags;
     string s;
 #define TEST_FLAG(x) if ((v & x) != 0) { s += string(# x) + " | "; v ^= x; }

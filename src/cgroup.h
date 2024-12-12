@@ -22,6 +22,9 @@
 
 #pragma once
 
+#ifndef TESTTEST
+#define TESTTEST
+
 #include <string>
 #include <map>
 #include <set>
@@ -538,4 +541,52 @@ namespace lrun {
         static int cg_version();
         static std::unique_ptr<Cgroup> create(const std::string &name);
     };
+
+    struct Device {
+        const char *name;
+        unsigned int minor;
+        // major is missing because all basic_devices have major = 1
+    };
+
+    extern Device basic_devices[5];
+
+    // following functions are called by clone_main_fn
+
+    void do_set_sysctl();
+    void do_privatize_filesystem(__attribute__((unused)) const Cgroup::spawn_arg& arg);
+    void do_remounts(const Cgroup::spawn_arg& arg);
+    void do_mount_bindfs(const Cgroup::spawn_arg& arg);
+    void do_chroot(const Cgroup::spawn_arg& arg);
+    void do_umount_outside_chroot(const Cgroup::spawn_arg& arg);
+    bool should_mount_proc(const Cgroup::spawn_arg& arg);
+    bool should_hide_sensitive(const Cgroup::spawn_arg& arg);
+    const char * get_proc_fs_type(const Cgroup::spawn_arg& arg);
+    void do_mount_proc(const Cgroup::spawn_arg& arg);
+    void do_hide_sensitive(const Cgroup::spawn_arg& arg);
+    std::list<int> get_fds();
+    void do_set_uts(const Cgroup::spawn_arg& arg);
+    void do_set_netns(const Cgroup::spawn_arg& arg);
+    void do_fd_redirect(int fd_dst, int fd_src);
+    void fd_set_cloexec(int fd, int enforce = 1);
+    void do_process_fds(const Cgroup::spawn_arg& arg);
+    void do_mount_tmpfs(const Cgroup::spawn_arg& arg);
+    void do_remount_dev(const Cgroup::spawn_arg& arg);
+    void do_chdir(const Cgroup::spawn_arg& arg);
+    void do_commands(const Cgroup::spawn_arg& arg);
+    void do_renice(const Cgroup::spawn_arg& arg);
+    void do_set_umask(const Cgroup::spawn_arg& arg);
+    void do_set_uid_gid(const Cgroup::spawn_arg& arg);
+    void do_apply_rlimits(const Cgroup::spawn_arg& arg);
+    void do_set_env(const Cgroup::spawn_arg& arg);
+    void do_seccomp(const Cgroup::spawn_arg& arg);
+    void do_set_new_privs(const Cgroup::spawn_arg& arg);
+    void init_signal_handler(int signal);
+    int clone_init_fn(void *);
+    int clone_main_fn(void *clone_arg);
+    int is_setns_pidns_supported();
+#ifndef NDEBUG
+    std::string clone_flags_to_str(int clone_flags);
+#endif
 }
+
+#endif

@@ -34,7 +34,6 @@
 #include <unistd.h>
 #include <climits>
 #include "cgroup.h"
-#include "cgroup.cc"
 #include "utils/linux_only.h"
 #include "utils/for_each.h"
 #include "utils/fs.h"
