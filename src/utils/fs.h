@@ -79,6 +79,11 @@ namespace fs {
     extern const char * const TYPE_CGROUP;
 
     /**
+     * Cgroup v2 filesystem type name: "cgroup2"
+     */
+    extern const char * const TYPE_CGROUP2;
+
+    /**
      * tmpfs type name: "tmpfs"
      */
     extern const char * const TYPE_TMPFS;

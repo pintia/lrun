@@ -109,7 +109,7 @@ TESTCASE(real_time_limit) {
 
 TESTCASE(signal) {
     for_each_flag("") {
-        test_c_code("main(c){return 1/(c-1);}",
+        test_c_code("main(){return 1/0;}",
                     "TERMSIG  8",  // SIGFPE
                     c.flag);
         test_c_code("main(int c){char*p=main;p[-1]=c;return 0;}",
@@ -118,8 +118,9 @@ TESTCASE(signal) {
         // this one may fail if pid namespace is not fully supported
         // and --isolate-process is true.
         // do not report a bug if you are using linux < 3.8
-        test_c_code("main(){kill(getpid(), 33);}",
-                    "TERMSIG  33",
+        // 33 code is not supported by later gcc, it will become `unknown signal 33`, so use valid signal here.
+        test_c_code("main(){kill(getpid(), 31);}",
+                    "TERMSIG  31",
                     c.flag);
     }
 }
@@ -162,9 +163,9 @@ TESTCASE(syscall_filter) {
 
     // test execve special case handling
     test_cmd("true", "EXITCODE 0", "--syscalls '!execve'");
-    test_cmd("true", "EXITCODE 0", "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,openat,read,exit'");
+    test_cmd("true", "EXITCODE 0", "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,openat,pread64,read,exit'");
     test_cmd("true", "EXITCODE 0", "--syscalls '!execve:a'");
     test_cmd("true", "EXITCODE 0", "--syscalls '!open:a'");
     test_cmd("env true", "EXITCODE 1" /* 126 */, "--syscalls '!execve'");
-    test_cmd("env true", "EXITCODE 1" /* 125 */, "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,openat,read,exit'");
+    test_cmd("env true", "EXITCODE 1" /* 125 */, "--syscalls 'access,arch_prctl,brk,close,exit_group,fstat,mmap,mprotect,munmap,open,openat,pread64,read,exit'");
 }

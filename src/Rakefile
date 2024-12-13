@@ -165,7 +165,7 @@ end
 task :default => [BIN]
 
 rule '.o' => '.cc' do |t|
-  flags = [try_cxxflags(['-std=c++11', '-std=c++0x'], '-std='),
+  flags = [try_cxxflags(['-std=c++17', '-std=c++11', '-std=c++0x'], '-std='),
            try_cxxflags(['-fstack-protector-strong', '-fstack-protector'], '-fstack'),
            try_cxxflags(['--param=ssp-buffer-size=4'], '--param=ssp-buffer-size'),
            try_cxxflags(['-D_FORTIFY_SOURCE=2'], '-D_FORTIFY_SOURCE'),
