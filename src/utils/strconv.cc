@@ -32,6 +32,12 @@ double strconv::to_double(const string& str) {
     return v;
 }
 
+int strconv::to_int(const string& str) {
+    int v = 0;
+    sscanf(str.c_str(), "%d", &v);
+    return v;
+}
+
 long strconv::to_long(const string& str) {
     long v = 0;
     sscanf(str.c_str(), "%ld", &v);
@@ -98,6 +104,12 @@ string strconv::from_double(double value, int precision) {
     char format[16];
     snprintf(format, sizeof format, "%%.%df", precision);
     snprintf(buf, sizeof buf, format, value);
+    return buf;
+}
+
+string strconv::from_int(int value) {
+    char buf[sizeof(int) * 3 + 1];
+    snprintf(buf, sizeof buf, "%d", value);
     return buf;
 }
 

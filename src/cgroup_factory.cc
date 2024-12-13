@@ -23,6 +23,7 @@
 #include "cgroup.h"
 #include "utils/for_each.h"
 #include "utils/fs.h"
+#include "utils/strconv.h"
 
 using namespace lrun;
 
@@ -33,23 +34,44 @@ int CgroupFactory::cg_version() {
     if (cg_version_ != 0) {
         return cg_version_;
     }
+    string cached = fs::read(CG_VERSION_DEST, 8);
+    if (!cached.empty()) {
+        return cg_version_ = strconv::to_int(cached);
+    }
     std::map<string, fs::MountEntry> mounts = fs::get_mounts();
     FOR_EACH_CONST(p, mounts) {
         const fs::MountEntry& ent = p.second;
-        if (ent.type == string(fs::TYPE_CGROUP)) return cg_version_ = 1;
+        if (ent.type == string(fs::TYPE_CGROUP)) {
+            cg_version_ = 1;
+            save();
+            return cg_version_;
+        }
     }
     FOR_EACH_CONST(p, mounts) {
         const fs::MountEntry& ent = p.second;
-        if (ent.type == string(fs::TYPE_CGROUP2)) return cg_version_ = 2;
+        if (ent.type == string(fs::TYPE_CGROUP2)) {
+            cg_version_ = 2;
+            save();
+            return cg_version_;
+        }
     }
     string available_filesystem = fs::read("/proc/filesystem", 4096);
     if (available_filesystem.find("cgroup") != string::npos) {
-        return cg_version_ = 1;
+        cg_version_ = 1;
+        save();
+        return cg_version_;
     }
     if (available_filesystem.find("cgroup2") != string::npos) {
-        return cg_version_ = 2;
+        cg_version_ = 2;
+        save();
+        return cg_version_;
     }
     FATAL("cannot determine cgroup version");
+}
+
+void CgroupFactory::save() {
+    fs::mkdir_p(CG_VERSION_DIR, /* mode */ 0755);
+    fs::write(CG_VERSION_DEST, strconv::from_int(cg_version_));
 }
 
 std::unique_ptr<Cgroup> CgroupFactory::create(const std::string &name) {

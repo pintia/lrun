@@ -536,7 +536,11 @@ namespace lrun {
 
     class CgroupFactory {
     private:
+        static constexpr char CG_VERSION_DEST[] = "/var/run/lrun/cg-version";
+        static constexpr char CG_VERSION_DIR[] = "/var/run/lrun";
+
         static int cg_version_;
+        static void save();
     public:
         static int cg_version();
         static std::unique_ptr<Cgroup> create(const std::string &name);
