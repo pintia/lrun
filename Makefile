@@ -14,6 +14,9 @@ install:
 
 clean:
 	cd src && rake clean
+	make clean -C tools/mirrorfs
+	make clean -C tools/netns-empty
+	make clean -C tools/netns-empty-lo
 
 deb:
 	debuild -i -us -uc -b
